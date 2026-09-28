@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:type="ContentApp">
+  <Id>821fff95-0713-430d-a6cb-b05ff9113d4e</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>drmvd</ProviderName>
+  <DefaultLocale>nl-NL</DefaultLocale>
+  <DisplayName DefaultValue="Pitch Timer"/>
+  <Description DefaultValue="Aftellende timer die doorloopt over alle dia's van een pitch (groen, oranje, rood)."/>
+  <IconUrl DefaultValue="https://drmvd.github.io/pitch-timer/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://drmvd.github.io/pitch-timer/icon-64.png"/>
+  <SupportUrl DefaultValue="https://github.com/drmvd/pitch-timer"/>
+  <Hosts>
+    <Host Name="Presentation"/>
+  </Hosts>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://drmvd.github.io/pitch-timer/index.html"/>
+    <RequestedWidth>320</RequestedWidth>
+    <RequestedHeight>60</RequestedHeight>
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+  <AllowSnapshot>true</AllowSnapshot>
+</OfficeApp>

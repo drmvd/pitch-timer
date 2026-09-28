@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pitch Timer</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>
+  :root {
+    --green: #2EAD4B; --orange: #F39C12; --red: #E03131;
+    --track: #E9ECEF; --text: #3a3a3a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    font-family: -apple-system, "Segoe UI", Calibri, Helvetica, Arial, sans-serif;
+    background: transparent; color: var(--text);
+    user-select: none; -webkit-user-select: none;
+  }
+  .row {
+    height: 100%; display: flex; align-items: center; gap: 4%;
+    padding: 0 3%;
+  }
+  .btn {
+    flex: 0 0 auto; border: 0; border-radius: 999px; cursor: pointer;
+    background: var(--green); color: #fff; font-weight: 700;
+    font-size: 16px; padding: 6px 14px; line-height: 1;
+    font-family: inherit;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .time {
+    flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums;
+    font-size: 22px; min-width: 3.2ch; text-align: right;
+  }
+  .track {
+    flex: 1 1 auto; height: 30%; min-height: 8px; max-height: 18px;
+    background: var(--track); border-radius: 999px; overflow: hidden;
+  }
+  .bar {
+    height: 100%; width: 100%; background: var(--green);
+    border-radius: 999px; transition: width .25s linear, background-color .4s;
+  }
+  .hidden { display: none !important; }
+
+  /* bewerk-modus */
+  .setup {
+    height: 100%; display: flex; align-items: center; gap: 6px;
+    padding: 0 8px; font-size: 13px; background: #fff;
+    border: 1px dashed #bbb; border-radius: 6px;
+  }
+  .setup select, .setup input {
+    font: inherit; padding: 3px 4px; border: 1px solid #bbb; border-radius: 4px;
+    background: #fff; color: #222;
+  }
+  .setup input { width: 4.2em; text-align: center; }
+  .setup button {
+    font: inherit; padding: 3px 10px; border-radius: 4px; border: 0;
+    background: #333; color: #fff; cursor: pointer;
+  }
+  .setup .ok { color: var(--green); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- Bewerk-modus: instellen -->
+<div id="setup" class="setup hidden">
+  <select id="mode" title="Soort timer">
+    <option value="start">Start pitch</option>
+    <option value="follow">Volgdia</option>
+  </select>
+  <input id="dur" value="3:00" title="Duur (min of m:ss)">
+  <button id="save">Opslaan</button>
+  <span id="saved" class="ok hidden">✓</span>
+</div>
+
+<!-- Diavoorstelling: timer -->
+<div id="timer" class="row hidden">
+  <button id="startBtn" class="btn hidden">▶ 3:00</button>
+  <div id="time" class="time"></div>
+  <div class="track"><div id="bar" class="bar"></div></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var KEY = "pitchTimer.active.v1";
+  var cfg = { mode: "start", dur: 180, id: "" };
+  var view = "read";
+  var office = null;
+
+  // ---------- helpers ----------
+  function parseDur(s) {
+    s = String(s || "").replace(",", ".").replace(/[^0-9:.]/g, "");
+    if (s.indexOf(":") >= 0) {
+      var p = s.split(":");
+      return (parseInt(p[0] || "0", 10) * 60) + parseInt(p[1] || "0", 10);
+    }
+    return Math.round(parseFloat(s || "0") * 60);
+  }
+  function fmt(sec) {
+    sec = Math.max(0, Math.ceil(sec));
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return m + ":" + (s < 10 ? "0" : "") + s;
+  }
+  function newId() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+  function thresholds(total) {
+    return { orange: Math.min(60, total / 3), red: Math.min(30, total / 6) };
+  }
+  function readActive() {
+    try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { return null; }
+  }
+  function writeActive(obj) {
+    try { localStorage.setItem(KEY, JSON.stringify(obj)); } catch (e) {}
+  }
+
+  // ---------- settings (per instance, stored in the deck) ----------
+  function loadSettings() {
+    if (!office) return;
+    var st = Office.context.document.settings;
+    var m = st.get("mode"), d = st.get("dur"), id = st.get("id");
+    if (m) cfg.mode = m;
+    if (d) cfg.dur = d;
+    if (id) cfg.id = id;
+  }
+  function saveSettings(cb) {
+    cfg.id = newId(); // nieuwe id bij elke keer opslaan (ook na kopiëren)
+    if (!office) { cb && cb(); return; }
+    var st = Office.context.document.settings;
+    st.set("mode", cfg.mode); st.set("dur", cfg.dur); st.set("id", cfg.id);
+    st.saveAsync(function () { cb && cb(); });
+  }
+
+  // ---------- UI ----------
+  var $ = function (id) { return document.getElementById(id); };
+
+  function showSetup() {
+    $("timer").classList.add("hidden");
+    $("setup").classList.remove("hidden");
+    $("mode").value = cfg.mode;
+    $("dur").value = fmt(cfg.dur);
+    $("dur").disabled = cfg.mode !== "start";
+  }
+  function showTimer() {
+    $("setup").classList.add("hidden");
+    $("timer").classList.remove("hidden");
+    render();
+  }
+
+  function paint(rest, total) {
+    var t = thresholds(total);
+    var color = rest <= t.red ? "var(--red)" : rest <= t.orange ? "var(--orange)" : "var(--green)";
+    var bar = $("bar"), time = $("time");
+    if (rest <= 0) {
+      bar.style.width = "100%";
+      bar.style.background = "var(--red)";
+      time.style.color = "var(--red)";
+      time.textContent = "0:00";
+    } else {
+      bar.style.width = (100 * rest / total).toFixed(2) + "%";
+      bar.style.background = color;
+      time.style.color = rest <= t.red ? "var(--red)" : "var(--text)";
+      time.textContent = fmt(rest);
+    }
+  }
+
+  function render() {
+    if (view === "edit") return;
+    var a = readActive();
+    var now = Date.now();
+    var btn = $("startBtn");
+
+    if (cfg.mode === "start") {
+      var mine = a && a.id === cfg.id;
+      if (!mine) {
+        // nog niet gestart: knop + volle groene balk
+        btn.textContent = "▶ " + fmt(cfg.dur);
+        btn.classList.remove("hidden");
+        $("time").textContent = "";
+        $("bar").style.width = "100%";
+        $("bar").style.background = "var(--green)";
+        return;
+      }
+      btn.classList.add("hidden");
+    } else {
+      btn.classList.add("hidden");
+    }
+
+    if (!a) {
+      $("time").textContent = "";
+      $("bar").style.width = "100%";
+      $("bar").style.background = "var(--green)";
+      return;
+    }
+    var rest = a.dur - (now - a.start) / 1000;
+    paint(rest, a.dur);
+  }
+
+  function start() {
+    writeActive({ id: cfg.id, start: Date.now(), dur: cfg.dur });
+    render();
+    try { $("startBtn").blur(); } catch (e) {}
+  }
+
+  // Toetsen doorgeven aan PowerPoint (voor als de focus in de timer staat)
+  function nav(dir) {
+    if (!office || !Office.context.document.goToByIdAsync) return;
+    Office.context.document.goToByIdAsync(dir, Office.GoToType.Index, function () {});
+  }
+  document.addEventListener("keydown", function (e) {
+    if (view === "edit" || !office) return;
+    var k = e.key;
+    if (k === "ArrowRight" || k === "ArrowDown" || k === "PageDown" || k === " " || k === "Enter" || k === "n" || k === "N") {
+      e.preventDefault(); nav(Office.Index.Next);
+    } else if (k === "ArrowLeft" || k === "ArrowUp" || k === "PageUp" || k === "Backspace" || k === "p" || k === "P") {
+      e.preventDefault(); nav(Office.Index.Previous);
+    }
+  });
+
+  $("startBtn").addEventListener("click", start);
+  $("mode").addEventListener("change", function () {
+    $("dur").disabled = $("mode").value !== "start";
+  });
+  $("save").addEventListener("click", function () {
+    cfg.mode = $("mode").value;
+    var d = parseDur($("dur").value);
+    if (d > 0) cfg.dur = d;
+    saveSettings(function () {
+      $("dur").value = fmt(cfg.dur);
+      $("saved").classList.remove("hidden");
+      setTimeout(function () { $("saved").classList.add("hidden"); }, 1500);
+    });
+  });
+
+  // Andere dia's (andere exemplaren) schrijven naar localStorage
+  window.addEventListener("storage", function (e) { if (e.key === KEY) render(); });
+  setInterval(render, 200);
+
+  function setView(v) {
+    view = v;
+    if (view === "edit") showSetup(); else showTimer();
+  }
+
+  // ---------- opstarten ----------
+  function boot() {
+    if (!cfg.id) cfg.id = newId();
+    if (office && Office.context.document.getActiveViewAsync) {
+      Office.context.document.getActiveViewAsync(function (r) {
+        setView(r.status === Office.AsyncResultStatus.Succeeded ? r.value : "read");
+      });
+      try {
+        Office.context.document.addHandlerAsync(Office.EventType.ActiveViewChanged, function (ev) {
+          setView(ev.activeView);
+        });
+      } catch (e) {}
+    } else {
+      // buiten PowerPoint (voorbeeld in browser): ?mode=start&dur=0:20&view=edit
+      var q = new URLSearchParams(location.search);
+      if (q.get("mode")) cfg.mode = q.get("mode");
+      if (q.get("dur")) cfg.dur = parseDur(q.get("dur"));
+      if (q.get("id")) cfg.id = q.get("id");
+      setView(q.get("view") || "read");
+    }
+  }
+
+  if (window.Office && Office.onReady) {
+    Office.onReady(function (info) {
+      office = !!(info && info.host);
+      if (office) {
+        loadSettings();
+        if (!cfg.id) {
+          // eerste keer: id vastleggen in het deck
+          cfg.id = newId();
+          try {
+            var st = Office.context.document.settings;
+            st.set("mode", cfg.mode); st.set("dur", cfg.dur); st.set("id", cfg.id);
+            st.saveAsync(function () {});
+          } catch (e) {}
+        }
+      }
+      boot();
+    });
+  } else {
+    boot();
+  }
+})();
+</script>
+</body>
+</html>
