@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -42,7 +42,7 @@
   }
   .hidden { display: none !important; }
 
-  /* bewerk-modus */
+  /* edit mode */
   .setup {
     height: 100%; display: flex; align-items: center; gap: 6px;
     padding: 0 8px; font-size: 13px; background: #fff;
@@ -62,18 +62,18 @@
 </head>
 <body>
 
-<!-- Bewerk-modus: instellen -->
+<!-- Edit mode: settings -->
 <div id="setup" class="setup hidden">
-  <select id="mode" title="Soort timer">
+  <select id="mode" title="Timer type">
     <option value="start">Start pitch</option>
-    <option value="follow">Volgdia</option>
+    <option value="follow">Follow slide</option>
   </select>
-  <input id="dur" value="3:00" title="Duur (min of m:ss)">
-  <button id="save">Opslaan</button>
+  <input id="dur" value="3:00" title="Duration (min or m:ss)">
+  <button id="save">Save</button>
   <span id="saved" class="ok hidden">✓</span>
 </div>
 
-<!-- Diavoorstelling: timer -->
+<!-- Slideshow: timer -->
 <div id="timer" class="row hidden">
   <button id="startBtn" class="btn hidden">▶ 3:00</button>
   <div id="time" class="time"></div>
@@ -123,7 +123,7 @@
     if (id) cfg.id = id;
   }
   function saveSettings(cb) {
-    cfg.id = newId(); // nieuwe id bij elke keer opslaan (ook na kopiëren)
+    cfg.id = newId(); // new id on every save (also after copying)
     if (!office) { cb && cb(); return; }
     var st = Office.context.document.settings;
     st.set("mode", cfg.mode); st.set("dur", cfg.dur); st.set("id", cfg.id);
@@ -172,7 +172,7 @@
     if (cfg.mode === "start") {
       var mine = a && a.id === cfg.id;
       if (!mine) {
-        // nog niet gestart: knop + volle groene balk
+        // not started yet: button + full green bar
         btn.textContent = "▶ " + fmt(cfg.dur);
         btn.classList.remove("hidden");
         $("time").textContent = "";
@@ -201,7 +201,7 @@
     try { $("startBtn").blur(); } catch (e) {}
   }
 
-  // Toetsen doorgeven aan PowerPoint (voor als de focus in de timer staat)
+  // Pass keys to PowerPoint (in case focus is inside the timer)
   function nav(dir) {
     if (!office || !Office.context.document.goToByIdAsync) return;
     Office.context.document.goToByIdAsync(dir, Office.GoToType.Index, function () {});
@@ -231,7 +231,7 @@
     });
   });
 
-  // Andere dia's (andere exemplaren) schrijven naar localStorage
+  // Other slides (other instances) write to localStorage
   window.addEventListener("storage", function (e) { if (e.key === KEY) render(); });
   setInterval(render, 200);
 
@@ -240,7 +240,7 @@
     if (view === "edit") showSetup(); else showTimer();
   }
 
-  // ---------- opstarten ----------
+  // ---------- startup ----------
   function boot() {
     if (!cfg.id) cfg.id = newId();
     if (office && Office.context.document.getActiveViewAsync) {
@@ -253,7 +253,7 @@
         });
       } catch (e) {}
     } else {
-      // buiten PowerPoint (voorbeeld in browser): ?mode=start&dur=0:20&view=edit
+      // outside PowerPoint (preview in a browser): ?mode=start&dur=0:20&view=edit
       var q = new URLSearchParams(location.search);
       if (q.get("mode")) cfg.mode = q.get("mode");
       if (q.get("dur")) cfg.dur = parseDur(q.get("dur"));
@@ -268,7 +268,7 @@
       if (office) {
         loadSettings();
         if (!cfg.id) {
-          // eerste keer: id vastleggen in het deck
+          // first time: store the id in the deck
           cfg.id = newId();
           try {
             var st = Office.context.document.settings;

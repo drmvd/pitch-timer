@@ -1,9 +1,9 @@
 # Pitch Timer (PowerPoint add-in)
 
-Aftellende timer die doorloopt over alle dia's van een pitch: groen → oranje (laatste minuut) → rood (laatste 30 s).
+Countdown timer that keeps running across all slides of a pitch: green → orange (last minute) → red (last 30 s).
 
-- **Start pitch**: zet op de eerste dia van een pitch, stel de duur in, klik *Opslaan*. In de diavoorstelling klik je op ▶ om te starten.
-- **Volgdia**: zet op de andere dia's van de pitch; toont de lopende timer.
+- **Start pitch**: place it on the first slide of a pitch, set the duration and click *Save*. During the slideshow, click ▶ to start.
+- **Follow slide**: place it on the other slides of the pitch; it shows the running timer.
 
-Installatie op de Mac: kopieer `manifest.xml` naar
-`~/Library/Containers/com.microsoft.Powerpoint/Data/Documents/wef/` en herstart PowerPoint.
+Installation on Mac: copy `manifest.xml` to
+`~/Library/Containers/com.microsoft.Powerpoint/Data/Documents/wef/` and restart PowerPoint.
